@@ -1,0 +1,11 @@
+Django
+djangorestframework
+djangorestframework-simplejwt
+django-cors-headers
+django-filter
+django-environ
+Pillow
+reportlab
+django-model-utils
+drf-spectacular
+psycopg2-binary
