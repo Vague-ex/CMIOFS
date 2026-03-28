@@ -1,4 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
+import {
+    clampPhilippinePhoneInput,
+    isValidPhilippinePhone,
+    PH_PHONE_HINT,
+    PH_PHONE_MAX_LENGTH,
+} from "../../utils/phone";
 
 const API_BASE = "/api/v1";
 
@@ -170,6 +176,10 @@ function UserForm({ initial, currentUserRole, onSave, onCancel }) {
     async function handleSubmit(e) {
         e.preventDefault();
         if (!form.username || !form.email) { setSaving("Username and email are required."); return; }
+        if (form.phone && !isValidPhilippinePhone(form.phone)) {
+            setSaving(`Invalid phone number. ${PH_PHONE_HINT}`);
+            return;
+        }
         if (!isEditing && form.password.length < 10) {
             setSaving("Password must be at least 10 characters."); return;
         }
@@ -201,7 +211,13 @@ function UserForm({ initial, currentUserRole, onSave, onCancel }) {
             <Input label="Email" required type="email" value={form.email}
                 onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
             <Input label="Phone" value={form.phone}
-                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+63 9xx xxx xxxx" />
+                onChange={e => setForm(f => ({ ...f, phone: clampPhilippinePhoneInput(e.target.value) }))}
+                placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                pattern="^(09[0-9]{9}|\+639[0-9]{9})$"
+                title={PH_PHONE_HINT}
+                maxLength={PH_PHONE_MAX_LENGTH}
+                inputMode="tel"
+            />
             <Select label="Role" required value={form.role}
                 onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
                 disabled={!isAdmin && isEditing}>

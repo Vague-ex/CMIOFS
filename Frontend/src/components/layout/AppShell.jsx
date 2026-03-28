@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './sidebar'
+import { useAuthStore } from '../../store/authstore'
 import DashboardPage from '../../pages/dashboard/DashboardPage'
 import ItemsPage from '../../pages/inventory/ItemsPage'
 import SettingsPage from '../../pages/settings/SettingsPage'
@@ -9,6 +10,9 @@ import SalesOrdersPage from '../../pages/clients/SalesOrdersPage'
 import SuppliersPage from '../../pages/suppliers/SuppliersPage'
 
 export default function AppShell() {
+    const role = useAuthStore((s) => s.user?.role || '')
+    const canViewSuppliers = ['SYSTEM_ADMIN', 'PURCHASING_MANAGER'].includes(role)
+
     return (
         <div className="flex min-h-screen bg-gray-100">
             <Sidebar />
@@ -22,7 +26,10 @@ export default function AppShell() {
                     <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
                     <Route path="/delivery-orders" element={<Navigate to="/sales-orders" replace />} />
                     <Route path="/sales-orders" element={<SalesOrdersPage />} />
-                    <Route path="/suppliers" element={<SuppliersPage />} />
+                    <Route
+                        path="/suppliers"
+                        element={canViewSuppliers ? <SuppliersPage /> : <Navigate to="/dashboard" replace />}
+                    />
                 </Routes>
             </main>
         </div>

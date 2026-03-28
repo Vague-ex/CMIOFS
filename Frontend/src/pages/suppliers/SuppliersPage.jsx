@@ -1,6 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../../api/suppliers'
+import {
+    clampPhilippinePhoneInput,
+    isValidPhilippinePhone,
+    PH_PHONE_HINT,
+    PH_PHONE_MAX_LENGTH,
+} from '../../utils/phone'
 import { toast } from 'sonner'
 import { Pencil, Trash2, X, Building2, Phone, Mail, MapPin } from 'lucide-react'
 
@@ -21,10 +27,16 @@ function Field({ label, children }) {
 
 function SupplierForm({ initial, onSubmit, onCancel, isPending, mode }) {
     const [form, setForm] = useState(initial)
+    const [error, setError] = useState('')
     const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
     const handleSubmit = e => {
         e.preventDefault()
+        if (form.phone && !isValidPhilippinePhone(form.phone)) {
+            setError(`Invalid phone number. ${PH_PHONE_HINT}`)
+            return
+        }
+        setError('')
         onSubmit(form)
     }
 
@@ -68,8 +80,12 @@ function SupplierForm({ initial, onSubmit, onCancel, isPending, mode }) {
                     <input
                         className={inputCls}
                         value={form.phone}
-                        onChange={e => set('phone', e.target.value)}
-                        placeholder="+63 9xx xxx xxxx"
+                        onChange={e => set('phone', clampPhilippinePhoneInput(e.target.value))}
+                        placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                        pattern="^(09[0-9]{9}|\+639[0-9]{9})$"
+                        title={PH_PHONE_HINT}
+                        maxLength={PH_PHONE_MAX_LENGTH}
+                        inputMode="tel"
                     />
                 </Field>
                 <div className="col-span-2">
@@ -83,6 +99,11 @@ function SupplierForm({ initial, onSubmit, onCancel, isPending, mode }) {
                     </Field>
                 </div>
                 <div className="col-span-2 flex gap-2 justify-end pt-2 border-t">
+                    {error && (
+                        <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2 border border-red-200 mr-auto">
+                            {error}
+                        </p>
+                    )}
                     <button
                         type="button"
                         onClick={onCancel}

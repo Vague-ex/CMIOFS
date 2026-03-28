@@ -5,7 +5,6 @@ import { LayoutDashboard, Package, ClipboardList, Truck, BarChart3, LogOut, Sett
 const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/inventory/items', icon: Package, label: 'Items' },
-    { to: '/suppliers', icon: Building2, label: 'Suppliers' },
     { to: '/purchase-orders', icon: ClipboardList, label: 'Purchase Orders' },
     { to: '/sales-orders', icon: Truck, label: 'Sales Orders' },
     { to: '/reports/stock', icon: BarChart3, label: 'Reports' },
@@ -14,6 +13,7 @@ const navItems = [
 export default function Sidebar() {
     const logout = useAuthStore((s) => s.logout)
     const role = useAuthStore((s) => s.user?.role || '')
+    const canViewSuppliers = ['SYSTEM_ADMIN', 'PURCHASING_MANAGER'].includes(role)
 
     const linkClass = ({ isActive }) =>
         `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition ${isActive
@@ -35,6 +35,13 @@ export default function Sidebar() {
                         {label}
                     </NavLink>
                 ))}
+
+                {canViewSuppliers && (
+                    <NavLink to="/suppliers" className={linkClass}>
+                        <Building2 size={16} />
+                        Suppliers
+                    </NavLink>
+                )}
 
                 {['SYSTEM_ADMIN', 'PURCHASING_MANAGER'].includes(role) && (
                     <NavLink to="/users" className={linkClass}>

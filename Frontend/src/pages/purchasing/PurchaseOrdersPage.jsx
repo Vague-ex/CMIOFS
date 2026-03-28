@@ -7,6 +7,12 @@ import {
 } from '../../api/purchasing'
 import { getSuppliers, createSupplierRequest } from '../../api/suppliers'
 import { getItems } from '../../api/inventory'
+import {
+    clampPhilippinePhoneInput,
+    isValidPhilippinePhone,
+    PH_PHONE_HINT,
+    PH_PHONE_MAX_LENGTH,
+} from '../../utils/phone'
 import { toast } from 'sonner'
 import { X, Plus, Trash2, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
 
@@ -62,6 +68,10 @@ function CreatePOModal({ onClose, onCreated, suppliers, items, onSupplierRequest
         e.preventDefault()
         if (!supplierRequest.name.trim()) {
             setRequestError('Supplier name is required.')
+            return
+        }
+        if (supplierRequest.phone && !isValidPhilippinePhone(supplierRequest.phone)) {
+            setRequestError(`Invalid phone number. ${PH_PHONE_HINT}`)
             return
         }
         setRequestSaving(true)
@@ -162,9 +172,13 @@ function CreatePOModal({ onClose, onCreated, suppliers, items, onSupplierRequest
                                     />
                                     <input
                                         className={inputCls}
-                                        placeholder="Phone"
+                                        placeholder="09XXXXXXXXX or +639XXXXXXXXX"
                                         value={supplierRequest.phone}
-                                        onChange={e => setSupplierRequestField('phone', e.target.value)}
+                                        onChange={e => setSupplierRequestField('phone', clampPhilippinePhoneInput(e.target.value))}
+                                        pattern="^(09[0-9]{9}|\+639[0-9]{9})$"
+                                        title={PH_PHONE_HINT}
+                                        maxLength={PH_PHONE_MAX_LENGTH}
+                                        inputMode="tel"
                                     />
                                 </div>
                                 <input

@@ -7,6 +7,12 @@ import {
 } from '../../api/clients'
 import { getClients } from '../../api/clients'
 import { getItems } from '../../api/inventory'
+import {
+    clampPhilippinePhoneInput,
+    isValidPhilippinePhone,
+    PH_PHONE_HINT,
+    PH_PHONE_MAX_LENGTH,
+} from '../../utils/phone'
 import { toast } from 'sonner'
 import { X, Plus, Trash2, Truck, CheckCircle2 } from 'lucide-react'
 
@@ -96,6 +102,10 @@ function CreateSOModal({ onClose, onCreated, clients, items, onClientRequested }
         e.preventDefault()
         if (!clientRequest.name.trim()) {
             setRequestError('Client name is required.')
+            return
+        }
+        if (clientRequest.phone && !isValidPhilippinePhone(clientRequest.phone)) {
+            setRequestError(`Invalid phone number. ${PH_PHONE_HINT}`)
             return
         }
         setRequestSaving(true)
@@ -219,9 +229,13 @@ function CreateSOModal({ onClose, onCreated, clients, items, onClientRequested }
                                     />
                                     <input
                                         className={inputCls}
-                                        placeholder="Phone"
+                                        placeholder="09XXXXXXXXX or +639XXXXXXXXX"
                                         value={clientRequest.phone}
-                                        onChange={e => setClientRequestField('phone', e.target.value)}
+                                        onChange={e => setClientRequestField('phone', clampPhilippinePhoneInput(e.target.value))}
+                                        pattern="^(09[0-9]{9}|\+639[0-9]{9})$"
+                                        title={PH_PHONE_HINT}
+                                        maxLength={PH_PHONE_MAX_LENGTH}
+                                        inputMode="tel"
                                     />
                                 </div>
                                 <input
