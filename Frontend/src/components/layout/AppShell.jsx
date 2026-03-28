@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Sidebar from './sidebar'
 import DashboardPage from '../../pages/dashboard/DashboardPage'
 import ItemsPage from '../../pages/inventory/ItemsPage'
+import SettingsPage from '../../pages/settings/SettingsPage'
+import UsersPage from '../../pages/users/UsersPage'
 
 export default function AppShell() {
     return (
@@ -12,6 +14,8 @@ export default function AppShell() {
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<DashboardPage />} />
                     <Route path="/inventory/items" element={<ItemsPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/users" element={<UsersPage />} />
                 </Routes>
             </main>
         </div>

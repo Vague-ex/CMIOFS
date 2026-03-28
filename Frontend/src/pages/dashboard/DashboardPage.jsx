@@ -16,6 +16,7 @@ export default function DashboardPage() {
     const items = itemsData?.data?.results ?? []
     const pos = poData?.data?.results ?? []
     const lowStock = items.filter(i => i.current_quantity <= i.reorder_point)
+    const toWholeNumber = (value) => Math.round(Number(value) || 0)
 
     const stats = [
         { label: 'Total Items', value: itemsData?.data?.count ?? 0 },
@@ -53,7 +54,7 @@ export default function DashboardPage() {
                             {lowStock.map((item, i) => (
                                 <tr key={item.id} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                     <td className="px-4 py-2">{item.name}</td>
-                                    <td className="px-4 py-2 text-red-600 font-medium">{item.current_quantity}</td>
+                                    <td className="px-4 py-2 text-red-600 font-medium">{toWholeNumber(item.current_quantity)}</td>
                                     <td className="px-4 py-2">{item.reorder_point}</td>
                                 </tr>
                             ))}
