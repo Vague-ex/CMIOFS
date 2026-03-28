@@ -2,7 +2,8 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
-
+from rest_framework_simplejwt.views import TokenObtainPairView
+from .serializers import CustomTokenObtainPairSerializer
 from .models import User, Role, AuditLog
 from .serializers import (
     UserSerializer, UserCreateSerializer, UserUpdateSerializer,
@@ -10,6 +11,8 @@ from .serializers import (
 )
 from .permissions import IsSystemAdmin, IsAdminOrManager
 
+class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
 
 def _get_client_ip(request):
     x_forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
@@ -151,3 +154,4 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends  = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = ['action', 'resource_type', 'performed_by']
     search_fields    = ['resource_name', 'performed_by__username']
+

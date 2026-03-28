@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import User, Role, AuditLog
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 
 class RoleSerializer(serializers.ModelSerializer):
@@ -115,3 +116,10 @@ class AuditLogSerializer(serializers.ModelSerializer):
         if obj.performed_by:
             return obj.performed_by.get_full_name() or obj.performed_by.username
         return 'System'
+    
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        token['role'] = User.RoleCode.SYSTEM_ADMIN if user.is_superuser else user.role
+        return token

@@ -12,17 +12,7 @@ const navItems = [
 
 export default function Sidebar() {
     const logout = useAuthStore((s) => s.logout)
-    const token = localStorage.getItem('access_token') || ''
-    let role = localStorage.getItem('user_role') || ''
-
-    if (!role && token.includes('.')) {
-        try {
-            const payload = JSON.parse(atob(token.split('.')[1]))
-            role = payload?.role || payload?.user_role || payload?.user?.role || ''
-        } catch {
-            role = ''
-        }
-    }
+    const role = useAuthStore((s) => s.user?.role || '')
 
     const linkClass = ({ isActive }) =>
         `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition ${isActive
@@ -39,27 +29,23 @@ export default function Sidebar() {
 
             <nav className="flex-1 p-4 space-y-1">
                 {navItems.map(({ to, icon: Icon, label }) => (
-                    <NavLink
-                        key={to}
-                        to={to}
-                        className={linkClass}
-                    >
+                    <NavLink key={to} to={to} className={linkClass}>
                         <Icon size={16} />
                         {label}
                     </NavLink>
                 ))}
 
-                {role === 'SYSTEM_ADMIN' && (
-                    <NavLink to="/settings" className={linkClass}>
-                        <Settings size={16} />
-                        Settings
-                    </NavLink>
-                )}
-
                 {['SYSTEM_ADMIN', 'PURCHASING_MANAGER'].includes(role) && (
                     <NavLink to="/users" className={linkClass}>
                         <Users size={16} />
                         Users
+                    </NavLink>
+                )}
+
+                {role === 'SYSTEM_ADMIN' && (
+                    <NavLink to="/settings" className={linkClass}>
+                        <Settings size={16} />
+                        Settings
                     </NavLink>
                 )}
             </nav>
