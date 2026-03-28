@@ -2,6 +2,7 @@ import client from './client'
 
 export const getClients = (params) => client.get('/clients/', { params })
 export const createClient = (data) => client.post('/clients/', data)
+export const createClientRequest = (data) => client.post('/client-requests/', data)
 export const updateClient = (id, data) => client.patch(`/clients/${id}/`, data)
 export const deleteClient = (id) => client.delete(`/clients/${id}/`)
 

@@ -2,13 +2,14 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
+from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
-from accounts.permissions import IsAdminOrManager
+from accounts.permissions import IsAdminOrManager, IsSystemAdmin
 from inventory.models import InventoryTransaction
-from .models import Client, SalesOrder, SalesOrderLine
+from .models import Client, ClientRequest, SalesOrder, SalesOrderLine
 from .serializers import (
     ClientSerializer, SalesOrderSerializer,
-    SalesOrderWriteSerializer
+    SalesOrderWriteSerializer, ClientRequestSerializer
 )
 
 
@@ -18,6 +19,65 @@ class ClientViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'contact_name', 'email']
     permission_classes = [IsAdminOrManager]
+
+
+class ClientRequestViewSet(viewsets.ModelViewSet):
+    queryset = ClientRequest.objects.select_related(
+        'requested_by', 'reviewed_by', 'linked_client'
+    ).order_by('-created')
+    serializer_class = ClientRequestSerializer
+    permission_classes = [IsAdminOrManager]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ['status']
+    search_fields = ['name', 'contact_name', 'email']
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        user = self.request.user
+        is_admin = user.is_superuser or user.role == 'SYSTEM_ADMIN'
+        if not is_admin:
+            qs = qs.filter(requested_by=user)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(requested_by=self.request.user)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsSystemAdmin])
+    def approve(self, request, pk=None):
+        req = self.get_object()
+        if req.status != ClientRequest.Status.PENDING:
+            return Response({'error': 'Only pending requests can be approved.'}, status=400)
+
+        client = Client.objects.create(
+            name=req.name,
+            contact_name=req.contact_name,
+            email=req.email,
+            phone=req.phone,
+            address=req.address,
+            is_active=True,
+        )
+        req.status = ClientRequest.Status.APPROVED
+        req.review_note = request.data.get('review_note', '')
+        req.reviewed_by = request.user
+        req.reviewed_at = timezone.now()
+        req.linked_client = client
+        req.save()
+
+        return Response(self.get_serializer(req).data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsSystemAdmin])
+    def reject(self, request, pk=None):
+        req = self.get_object()
+        if req.status != ClientRequest.Status.PENDING:
+            return Response({'error': 'Only pending requests can be rejected.'}, status=400)
+
+        req.status = ClientRequest.Status.REJECTED
+        req.review_note = request.data.get('review_note', '')
+        req.reviewed_by = request.user
+        req.reviewed_at = timezone.now()
+        req.save()
+
+        return Response(self.get_serializer(req).data, status=status.HTTP_200_OK)
 
 
 class SalesOrderViewSet(viewsets.ModelViewSet):
@@ -56,7 +116,7 @@ class SalesOrderViewSet(viewsets.ModelViewSet):
         return Response(SalesOrderSerializer(so).data)
 
     @action(detail=True, methods=['post'], url_path='dispatch')
-    def dispatch(self, request, pk=None):
+    def dispatch_order(self, request, pk=None):
         """
         Deduct items from inventory and mark as dispatched.
         """

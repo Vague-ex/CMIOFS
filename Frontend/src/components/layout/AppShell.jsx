@@ -20,7 +20,7 @@ export default function AppShell() {
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/users" element={<UsersPage />} />
                     <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
-                    <Route path="/delivery-orders" element={<SalesOrdersPage />} />
+                    <Route path="/delivery-orders" element={<Navigate to="/sales-orders" replace />} />
                     <Route path="/sales-orders" element={<SalesOrdersPage />} />
                     <Route path="/suppliers" element={<SuppliersPage />} />
                 </Routes>

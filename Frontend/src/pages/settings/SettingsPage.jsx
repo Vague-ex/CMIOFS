@@ -580,11 +580,230 @@ function AuditLogPanel() {
     );
 }
 
+// ─── Pending Requests Panel ──────────────────────────────────────────────────
+
+const REQUEST_STATUS_COLORS = {
+    PENDING: "amber",
+    APPROVED: "green",
+    REJECTED: "red",
+};
+
+function PendingRequestsPanel() {
+    const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
+    const [supplierRequests, setSupplierRequests] = useState([]);
+    const [clientRequests, setClientRequests] = useState([]);
+    const [statusFilter, setStatusFilter] = useState("PENDING");
+    const [error, setError] = useState("");
+
+    const normalize = (data) => data?.results || data || [];
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const query = statusFilter ? `?status=${statusFilter}` : "";
+            const [supplierData, clientData] = await Promise.all([
+                apiFetch(`/supplier-requests/${query}`),
+                apiFetch(`/client-requests/${query}`),
+            ]);
+            setSupplierRequests(normalize(supplierData));
+            setClientRequests(normalize(clientData));
+        } catch (err) {
+            setError(err.message || "Failed to load pending requests.");
+        } finally {
+            setLoading(false);
+        }
+    }, [statusFilter]);
+
+    useEffect(() => { load(); }, [load]);
+
+    async function handleReview(type, req, action) {
+        const note = window.prompt(
+            `${action === "approve" ? "Approve" : "Reject"} request for ${req.name}.\nOptional review note:`
+        );
+        if (note === null) return;
+
+        setSubmitting(true);
+        setError("");
+        try {
+            const base = type === "supplier" ? "supplier-requests" : "client-requests";
+            await apiFetch(`/${base}/${req.id}/${action}/`, {
+                method: "POST",
+                body: JSON.stringify({ review_note: note || "" }),
+            });
+            await load();
+        } catch (err) {
+            setError(err.message || "Failed to process request.");
+        } finally {
+            setSubmitting(false);
+        }
+    }
+
+    const total = supplierRequests.length + clientRequests.length;
+
+    return (
+        <div>
+            <div className="flex items-center justify-between mb-5">
+                <div>
+                    <h2 className="text-lg font-semibold text-[#1F3864]">Pending Requests</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                        Review manager-submitted supplier and client master data requests.
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <select
+                        value={statusFilter}
+                        onChange={e => setStatusFilter(e.target.value)}
+                        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 focus:border-[#2E75B6] focus:outline-none"
+                    >
+                        <option value="PENDING">Pending</option>
+                        <option value="APPROVED">Approved</option>
+                        <option value="REJECTED">Rejected</option>
+                        <option value="">All</option>
+                    </select>
+                    <button
+                        onClick={load}
+                        className="px-3 py-1.5 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            {error && <FormError error={error} />}
+
+            {loading ? <Spinner /> : (
+                <>
+                    <div className="mb-4 text-sm text-gray-600">
+                        Showing <span className="font-semibold text-[#1F3864]">{total}</span> request{total === 1 ? "" : "s"}
+                    </div>
+
+                    <div className="space-y-6">
+                        <div>
+                            <h3 className="text-sm font-semibold text-[#1F3864] mb-2">Supplier Requests</h3>
+                            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                                {supplierRequests.length === 0 ? (
+                                    <div className="py-10 text-center text-sm text-gray-500">No supplier requests found.</div>
+                                ) : (
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-[#1F3864] text-white">
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Name</th>
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Contact</th>
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Requested By</th>
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Status</th>
+                                                <th className="px-4 py-3" />
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {supplierRequests.map((req, i) => (
+                                                <tr key={`supplier-${req.id}`} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-medium text-gray-900">{req.name}</div>
+                                                        <div className="text-xs text-gray-500">{req.email || "No email"}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-600">{req.contact_name || req.phone || "-"}</td>
+                                                    <td className="px-4 py-3 text-gray-600">{req.requested_by_name || "System"}</td>
+                                                    <td className="px-4 py-3">
+                                                        <Badge color={REQUEST_STATUS_COLORS[req.status] || "gray"}>{req.status}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {req.status === "PENDING" && (
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button
+                                                                    disabled={submitting}
+                                                                    onClick={() => handleReview("supplier", req, "approve")}
+                                                                    className="px-2.5 py-1 rounded border border-green-300 text-xs text-green-700 hover:bg-green-50 disabled:opacity-50"
+                                                                >
+                                                                    Approve
+                                                                </button>
+                                                                <button
+                                                                    disabled={submitting}
+                                                                    onClick={() => handleReview("supplier", req, "reject")}
+                                                                    className="px-2.5 py-1 rounded border border-red-300 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-sm font-semibold text-[#1F3864] mb-2">Client Requests</h3>
+                            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                                {clientRequests.length === 0 ? (
+                                    <div className="py-10 text-center text-sm text-gray-500">No client requests found.</div>
+                                ) : (
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="bg-[#1F3864] text-white">
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Name</th>
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Contact</th>
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Requested By</th>
+                                                <th className="text-left px-4 py-3 text-xs font-medium uppercase tracking-wider">Status</th>
+                                                <th className="px-4 py-3" />
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {clientRequests.map((req, i) => (
+                                                <tr key={`client-${req.id}`} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                                                    <td className="px-4 py-3">
+                                                        <div className="font-medium text-gray-900">{req.name}</div>
+                                                        <div className="text-xs text-gray-500">{req.email || "No email"}</div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-gray-600">{req.contact_name || req.phone || "-"}</td>
+                                                    <td className="px-4 py-3 text-gray-600">{req.requested_by_name || "System"}</td>
+                                                    <td className="px-4 py-3">
+                                                        <Badge color={REQUEST_STATUS_COLORS[req.status] || "gray"}>{req.status}</Badge>
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        {req.status === "PENDING" && (
+                                                            <div className="flex gap-2 justify-end">
+                                                                <button
+                                                                    disabled={submitting}
+                                                                    onClick={() => handleReview("client", req, "approve")}
+                                                                    className="px-2.5 py-1 rounded border border-green-300 text-xs text-green-700 hover:bg-green-50 disabled:opacity-50"
+                                                                >
+                                                                    Approve
+                                                                </button>
+                                                                <button
+                                                                    disabled={submitting}
+                                                                    onClick={() => handleReview("client", req, "reject")}
+                                                                    className="px-2.5 py-1 rounded border border-red-300 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                                                                >
+                                                                    Reject
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 
 const TABS = [
     { id: "categories", label: "Material Categories", icon: "" },
     { id: "uom", label: "Units of Measurement", icon: "" },
+    { id: "requests", label: "Pending Requests", icon: "" },
     { id: "audit", label: "Audit Trail", icon: "" },
 ];
 
@@ -627,6 +846,7 @@ export default function SettingsPage() {
                         <div className="p-0">
                             {activeTab === "categories" && <CategoriesPanel />}
                             {activeTab === "uom" && <UOMPanel />}
+                            {activeTab === "requests" && <PendingRequestsPanel />}
                             {activeTab === "audit" && <AuditLogPanel />}
                         </div>
                     </div>

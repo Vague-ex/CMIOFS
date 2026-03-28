@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Client, SalesOrder, SalesOrderLine
+from .models import Client, ClientRequest, SalesOrder, SalesOrderLine
 
 
 class ClientSerializer(serializers.ModelSerializer):
@@ -7,6 +7,30 @@ class ClientSerializer(serializers.ModelSerializer):
         model = Client
         fields = '__all__'
         read_only_fields = ['created', 'modified']
+
+
+class ClientRequestSerializer(serializers.ModelSerializer):
+    requested_by_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+    linked_client_name = serializers.CharField(source='linked_client.name', read_only=True)
+
+    class Meta:
+        model = ClientRequest
+        fields = '__all__'
+        read_only_fields = [
+            'created', 'modified', 'status', 'requested_by',
+            'reviewed_by', 'reviewed_at', 'linked_client',
+        ]
+
+    def get_requested_by_name(self, obj):
+        if obj.requested_by:
+            return obj.requested_by.get_full_name() or obj.requested_by.username
+        return None
+
+    def get_reviewed_by_name(self, obj):
+        if obj.reviewed_by:
+            return obj.reviewed_by.get_full_name() or obj.reviewed_by.username
+        return None
 
 
 class SOLineSerializer(serializers.ModelSerializer):

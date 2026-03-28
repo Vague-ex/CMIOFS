@@ -15,6 +15,46 @@ class Client(TimeStampedModel):
         return self.name
 
 
+class ClientRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = 'PENDING', 'Pending'
+        APPROVED = 'APPROVED', 'Approved'
+        REJECTED = 'REJECTED', 'Rejected'
+
+    name = models.CharField(max_length=200)
+    contact_name = models.CharField(max_length=200, blank=True)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    address = models.TextField(blank=True)
+    justification = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    requested_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='client_requests',
+    )
+    reviewed_by = models.ForeignKey(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_client_requests',
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_note = models.TextField(blank=True)
+    linked_client = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='requests',
+    )
+
+    def __str__(self):
+        return f"{self.name} ({self.status})"
+
+
 class SalesOrder(TimeStampedModel):
     class Status(models.TextChoices):
         DRAFT       = 'DRAFT',       'Draft'

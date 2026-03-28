@@ -5,7 +5,7 @@ import {
     submitPO, supplierAcceptPO, supplierRejectPO,
     receivePO, cancelPO,
 } from '../../api/purchasing'
-import { getSuppliers } from '../../api/suppliers'
+import { getSuppliers, createSupplierRequest } from '../../api/suppliers'
 import { getItems } from '../../api/inventory'
 import { toast } from 'sonner'
 import { X, Plus, Trash2, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
@@ -34,12 +34,18 @@ function StatusBadge({ status }) {
 
 // ── Create PO modal ────────────────────────────────────────────────────────────
 
-function CreatePOModal({ onClose, onCreated, suppliers, items }) {
+function CreatePOModal({ onClose, onCreated, suppliers, items, onSupplierRequested }) {
     const [supplierId, setSupplierId] = useState('')
     const [notes, setNotes] = useState('')
     const [lines, setLines] = useState([{ item: '', quantity_ordered: 1, unit_price: 0 }])
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    const [showSupplierRequest, setShowSupplierRequest] = useState(false)
+    const [supplierRequest, setSupplierRequest] = useState({
+        name: '', contact_name: '', email: '', phone: '', address: '', justification: ''
+    })
+    const [requestSaving, setRequestSaving] = useState(false)
+    const [requestError, setRequestError] = useState('')
 
     const addLine = () => setLines(l => [...l, { item: '', quantity_ordered: 1, unit_price: 0 }])
     const removeLine = i => setLines(l => l.filter((_, idx) => idx !== i))
@@ -47,6 +53,35 @@ function CreatePOModal({ onClose, onCreated, suppliers, items }) {
         setLines(l => l.map((ln, idx) => idx === i ? { ...ln, [k]: v } : ln))
 
     const total = lines.reduce((s, l) => s + (Number(l.quantity_ordered) * Number(l.unit_price)), 0)
+
+    const setSupplierRequestField = (key, value) => {
+        setSupplierRequest(prev => ({ ...prev, [key]: value }))
+    }
+
+    const submitSupplierRequest = async (e) => {
+        e.preventDefault()
+        if (!supplierRequest.name.trim()) {
+            setRequestError('Supplier name is required.')
+            return
+        }
+        setRequestSaving(true)
+        setRequestError('')
+        try {
+            await createSupplierRequest({
+                ...supplierRequest,
+                name: supplierRequest.name.trim(),
+            })
+            toast.success('Supplier request submitted for admin approval.')
+            setShowSupplierRequest(false)
+            setSupplierRequest({ name: '', contact_name: '', email: '', phone: '', address: '', justification: '' })
+            onSupplierRequested?.()
+        } catch (err) {
+            const msg = err?.response?.data?.detail || err?.response?.data?.error || 'Failed to submit supplier request.'
+            setRequestError(msg)
+        } finally {
+            setRequestSaving(false)
+        }
+    }
 
     const handleSubmit = async e => {
         e.preventDefault()
@@ -97,6 +132,77 @@ function CreatePOModal({ onClose, onCreated, suppliers, items }) {
                                 <option key={s.id} value={s.id}>{s.name}</option>
                             ))}
                         </select>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowSupplierRequest(v => !v)
+                                setRequestError('')
+                            }}
+                            className="mt-2 text-xs text-[#2E75B6] hover:text-[#1F3864]"
+                        >
+                            {showSupplierRequest ? 'Hide request form' : "Can't find supplier? Request new supplier"}
+                        </button>
+
+                        {showSupplierRequest && (
+                            <div className="mt-3 border border-blue-100 bg-blue-50 rounded-md p-3 space-y-2">
+                                <p className="text-xs font-medium text-[#1F3864]">New Supplier Request</p>
+                                <input
+                                    className={inputCls}
+                                    placeholder="Supplier name *"
+                                    value={supplierRequest.name}
+                                    onChange={e => setSupplierRequestField('name', e.target.value)}
+                                    required
+                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        className={inputCls}
+                                        placeholder="Contact person"
+                                        value={supplierRequest.contact_name}
+                                        onChange={e => setSupplierRequestField('contact_name', e.target.value)}
+                                    />
+                                    <input
+                                        className={inputCls}
+                                        placeholder="Phone"
+                                        value={supplierRequest.phone}
+                                        onChange={e => setSupplierRequestField('phone', e.target.value)}
+                                    />
+                                </div>
+                                <input
+                                    type="email"
+                                    className={inputCls}
+                                    placeholder="Email"
+                                    value={supplierRequest.email}
+                                    onChange={e => setSupplierRequestField('email', e.target.value)}
+                                />
+                                <textarea
+                                    className={inputCls}
+                                    rows={2}
+                                    placeholder="Address"
+                                    value={supplierRequest.address}
+                                    onChange={e => setSupplierRequestField('address', e.target.value)}
+                                />
+                                <textarea
+                                    className={inputCls}
+                                    rows={2}
+                                    placeholder="Why this supplier is needed (optional)"
+                                    value={supplierRequest.justification}
+                                    onChange={e => setSupplierRequestField('justification', e.target.value)}
+                                />
+                                {requestError && (
+                                    <p className="text-xs text-red-700 bg-red-50 rounded px-2 py-1 border border-red-200">{requestError}</p>
+                                )}
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={submitSupplierRequest}
+                                        disabled={requestSaving}
+                                        className="px-3 py-1.5 text-xs bg-[#2E75B6] text-white rounded-md hover:bg-[#1F3864] disabled:opacity-50"
+                                    >
+                                        {requestSaving ? 'Submitting...' : 'Submit Supplier Request'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Lines */}
@@ -464,10 +570,10 @@ function SupplierResponseModal({ po, onClose, onUpdated }) {
                             <label
                                 key={v}
                                 className={`flex-1 flex items-center justify-center gap-2 border rounded-md py-2.5 text-sm font-medium cursor-pointer transition ${action === v
-                                        ? v === 'accept'
-                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                                            : 'border-red-400 bg-red-50 text-red-700'
-                                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                                    ? v === 'accept'
+                                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                                        : 'border-red-400 bg-red-50 text-red-700'
+                                    : 'border-gray-300 text-gray-600 hover:bg-gray-50'
                                     }`}
                             >
                                 <input
@@ -514,8 +620,8 @@ function SupplierResponseModal({ po, onClose, onUpdated }) {
                             type="submit"
                             disabled={saving}
                             className={`px-4 py-2 text-sm text-white rounded-md disabled:opacity-50 ${action === 'accept'
-                                    ? 'bg-emerald-600 hover:bg-emerald-700'
-                                    : 'bg-red-600 hover:bg-red-700'
+                                ? 'bg-emerald-600 hover:bg-emerald-700'
+                                : 'bg-red-600 hover:bg-red-700'
                                 }`}
                         >
                             {saving ? 'Saving...' : action === 'accept' ? 'Mark Accepted' : 'Mark Rejected'}
@@ -782,6 +888,7 @@ export default function PurchaseOrdersPage() {
                     onCreated={handleCreated}
                     suppliers={suppliers}
                     items={items}
+                    onSupplierRequested={() => queryClient.invalidateQueries({ queryKey: ['suppliers'] })}
                 />
             )}
             {modal === 'respond' && selectedPO && (
@@ -837,8 +944,8 @@ export default function PurchaseOrdersPage() {
                             key={s}
                             onClick={() => setStatusFilter(s)}
                             className={`px-3 py-1 rounded-full text-xs font-medium transition ${statusFilter === s
-                                    ? 'bg-[#2E75B6] text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                ? 'bg-[#2E75B6] text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                 }`}
                         >
                             {s === '' ? 'All' : STATUS_META[s]?.label || s}

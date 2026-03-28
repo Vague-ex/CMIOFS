@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     getSalesOrders, createSalesOrder,
     confirmSO, approveSO, dispatchSO, deliverSO, cancelSO,
+    createClientRequest,
 } from '../../api/clients'
 import { getClients } from '../../api/clients'
 import { getItems } from '../../api/inventory'
@@ -42,10 +43,10 @@ function SOProgress({ status }) {
                     <div className="flex flex-col items-center flex-1">
                         <div
                             className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${idx < current
-                                    ? 'bg-[#2E75B6] text-white'
-                                    : idx === current
-                                        ? 'bg-[#1F3864] text-white ring-2 ring-[#2E75B6] ring-offset-1'
-                                        : 'bg-gray-200 text-gray-400'
+                                ? 'bg-[#2E75B6] text-white'
+                                : idx === current
+                                    ? 'bg-[#1F3864] text-white ring-2 ring-[#2E75B6] ring-offset-1'
+                                    : 'bg-gray-200 text-gray-400'
                                 }`}
                         >
                             {idx < current ? '✓' : idx + 1}
@@ -65,12 +66,18 @@ function SOProgress({ status }) {
 
 // ── Create SO modal ────────────────────────────────────────────────────────────
 
-function CreateSOModal({ onClose, onCreated, clients, items }) {
+function CreateSOModal({ onClose, onCreated, clients, items, onClientRequested }) {
     const [clientId, setClientId] = useState('')
     const [notes, setNotes] = useState('')
     const [lines, setLines] = useState([{ item: '', quantity_requested: 1, unit_price: 0 }])
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    const [showClientRequest, setShowClientRequest] = useState(false)
+    const [clientRequest, setClientRequest] = useState({
+        name: '', contact_name: '', email: '', phone: '', address: '', justification: ''
+    })
+    const [requestSaving, setRequestSaving] = useState(false)
+    const [requestError, setRequestError] = useState('')
 
     const addLine = () => setLines(l => [...l, { item: '', quantity_requested: 1, unit_price: 0 }])
     const removeLine = i => setLines(l => l.filter((_, idx) => idx !== i))
@@ -80,6 +87,35 @@ function CreateSOModal({ onClose, onCreated, clients, items }) {
     const total = lines.reduce(
         (s, l) => s + (Number(l.quantity_requested) * Number(l.unit_price)), 0
     )
+
+    const setClientRequestField = (key, value) => {
+        setClientRequest(prev => ({ ...prev, [key]: value }))
+    }
+
+    const submitClientRequest = async (e) => {
+        e.preventDefault()
+        if (!clientRequest.name.trim()) {
+            setRequestError('Client name is required.')
+            return
+        }
+        setRequestSaving(true)
+        setRequestError('')
+        try {
+            await createClientRequest({
+                ...clientRequest,
+                name: clientRequest.name.trim(),
+            })
+            toast.success('Client request submitted for admin approval.')
+            setShowClientRequest(false)
+            setClientRequest({ name: '', contact_name: '', email: '', phone: '', address: '', justification: '' })
+            onClientRequested?.()
+        } catch (err) {
+            const msg = err?.response?.data?.detail || err?.response?.data?.error || 'Failed to submit client request.'
+            setRequestError(msg)
+        } finally {
+            setRequestSaving(false)
+        }
+    }
 
     // Show current stock when item selected
     const getItemStock = itemId => {
@@ -153,6 +189,77 @@ function CreateSOModal({ onClose, onCreated, clients, items }) {
                                 <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setShowClientRequest(v => !v)
+                                setRequestError('')
+                            }}
+                            className="mt-2 text-xs text-[#2E75B6] hover:text-[#1F3864]"
+                        >
+                            {showClientRequest ? 'Hide request form' : "Can't find client? Request new client"}
+                        </button>
+
+                        {showClientRequest && (
+                            <div className="mt-3 border border-blue-100 bg-blue-50 rounded-md p-3 space-y-2">
+                                <p className="text-xs font-medium text-[#1F3864]">New Client Request</p>
+                                <input
+                                    className={inputCls}
+                                    placeholder="Client name *"
+                                    value={clientRequest.name}
+                                    onChange={e => setClientRequestField('name', e.target.value)}
+                                    required
+                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input
+                                        className={inputCls}
+                                        placeholder="Contact person"
+                                        value={clientRequest.contact_name}
+                                        onChange={e => setClientRequestField('contact_name', e.target.value)}
+                                    />
+                                    <input
+                                        className={inputCls}
+                                        placeholder="Phone"
+                                        value={clientRequest.phone}
+                                        onChange={e => setClientRequestField('phone', e.target.value)}
+                                    />
+                                </div>
+                                <input
+                                    type="email"
+                                    className={inputCls}
+                                    placeholder="Email"
+                                    value={clientRequest.email}
+                                    onChange={e => setClientRequestField('email', e.target.value)}
+                                />
+                                <textarea
+                                    className={inputCls}
+                                    rows={2}
+                                    placeholder="Address"
+                                    value={clientRequest.address}
+                                    onChange={e => setClientRequestField('address', e.target.value)}
+                                />
+                                <textarea
+                                    className={inputCls}
+                                    rows={2}
+                                    placeholder="Why this client is needed (optional)"
+                                    value={clientRequest.justification}
+                                    onChange={e => setClientRequestField('justification', e.target.value)}
+                                />
+                                {requestError && (
+                                    <p className="text-xs text-red-700 bg-red-50 rounded px-2 py-1 border border-red-200">{requestError}</p>
+                                )}
+                                <div className="flex justify-end">
+                                    <button
+                                        type="button"
+                                        onClick={submitClientRequest}
+                                        disabled={requestSaving}
+                                        className="px-3 py-1.5 text-xs bg-[#2E75B6] text-white rounded-md hover:bg-[#1F3864] disabled:opacity-50"
+                                    >
+                                        {requestSaving ? 'Submitting...' : 'Submit Client Request'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Lines */}
@@ -607,6 +714,7 @@ export default function SalesOrdersPage() {
                     onCreated={handleCreated}
                     clients={clients}
                     items={items}
+                    onClientRequested={() => queryClient.invalidateQueries({ queryKey: ['clients'] })}
                 />
             )}
             {modal === 'deliver' && selectedSO && (
@@ -655,8 +763,8 @@ export default function SalesOrdersPage() {
                             key={s}
                             onClick={() => setStatusFilter(s)}
                             className={`px-3 py-1 rounded-full text-xs font-medium transition ${statusFilter === s
-                                    ? 'bg-[#2E75B6] text-white'
-                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                ? 'bg-[#2E75B6] text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                                 }`}
                         >
                             {s === '' ? 'All' : STATUS_META[s]?.label || s}
