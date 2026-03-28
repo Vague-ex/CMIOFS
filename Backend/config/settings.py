@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'purchasing',
     'dispatch',
     'supplier',
+    'clients',
     'reports',
 ]
 

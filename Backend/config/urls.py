@@ -36,6 +36,7 @@ urlpatterns = [
     path('api/v1/', include('purchasing.urls')),
     path('api/v1/', include('dispatch.urls')),
     path('api/v1/', include('supplier.urls')),
+    path('api/v1/', include('clients.urls')),
     path('api/v1/', include('reports.urls')),
 
     # API docs
