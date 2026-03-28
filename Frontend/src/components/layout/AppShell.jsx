@@ -4,6 +4,9 @@ import DashboardPage from '../../pages/dashboard/DashboardPage'
 import ItemsPage from '../../pages/inventory/ItemsPage'
 import SettingsPage from '../../pages/settings/SettingsPage'
 import UsersPage from '../../pages/users/UsersPage'
+import PurchaseOrdersPage from '../../pages/purchasing/PurchaseOrdersPage'
+import SalesOrdersPage from '../../pages/clients/SalesOrdersPage'
+import SuppliersPage from '../../pages/suppliers/SuppliersPage'
 
 export default function AppShell() {
     return (
@@ -16,6 +19,10 @@ export default function AppShell() {
                     <Route path="/inventory/items" element={<ItemsPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/users" element={<UsersPage />} />
+                    <Route path="/purchase-orders" element={<PurchaseOrdersPage />} />
+                    <Route path="/delivery-orders" element={<SalesOrdersPage />} />
+                    <Route path="/sales-orders" element={<SalesOrdersPage />} />
+                    <Route path="/suppliers" element={<SuppliersPage />} />
                 </Routes>
             </main>
         </div>

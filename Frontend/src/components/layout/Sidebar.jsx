@@ -1,12 +1,14 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Package, ClipboardList, Truck, BarChart3, LogOut, Settings, Users } from 'lucide-react'
 import { useAuthStore } from '../../store/authstore'
+import { LayoutDashboard, Package, ClipboardList, Truck, BarChart3, LogOut, Settings, Users, Building2 } from 'lucide-react'
 
 const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/inventory/items', icon: Package, label: 'Items' },
+    { to: '/suppliers', icon: Building2, label: 'Suppliers' },
     { to: '/purchase-orders', icon: ClipboardList, label: 'Purchase Orders' },
     { to: '/delivery-orders', icon: Truck, label: 'Delivery Orders' },
+    { to: '/sales-orders', icon: Truck, label: 'Sales Orders' },
     { to: '/reports/stock', icon: BarChart3, label: 'Reports' },
 ]
 
