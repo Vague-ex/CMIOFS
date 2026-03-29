@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authstore'
+import { SidebarProvider } from './context/SidebarContext'
 import LoginPage from './pages/auth/LoginPage'
 import AppShell from './components/layout/AppShell'
 
@@ -16,7 +17,9 @@ export default function App() {
         path="/*"
         element={
           <PrivateRoute>
-            <AppShell />
+            <SidebarProvider>
+              <AppShell />
+            </SidebarProvider>
           </PrivateRoute>
         }
       />
