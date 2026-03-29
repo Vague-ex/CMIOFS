@@ -111,7 +111,10 @@ function CreatePOModal({ onClose, onCreated, suppliers, items, onSupplierRequest
             })
             onCreated(res.data)
         } catch (err) {
-            setError(err?.response?.data?.detail || 'Failed to create PO.')
+            console.error('PO creation error:', err.response?.data)
+            const errorMsg = err?.response?.data?.detail ||
+                (typeof err?.response?.data === 'object' ? JSON.stringify(err?.response?.data) : 'Failed to create PO.')
+            setError(errorMsg)
         } finally {
             setSaving(false)
         }
@@ -249,7 +252,13 @@ function CreatePOModal({ onClose, onCreated, suppliers, items, onSupplierRequest
                                                 <select
                                                     className="w-full text-sm border-0 focus:ring-0 focus:outline-none"
                                                     value={ln.item}
-                                                    onChange={e => setLine(i, 'item', e.target.value)}
+                                                    onChange={e => {
+                                                        setLine(i, 'item', e.target.value)
+                                                        const selectedItem = items.find(it => it.id == e.target.value)
+                                                        if (selectedItem) {
+                                                            setLine(i, 'unit_price', selectedItem.standard_cost || 0)
+                                                        }
+                                                    }}
                                                     required
                                                 >
                                                     <option value="">— Select —</option>

@@ -11,7 +11,14 @@ class POLineSerializer(serializers.ModelSerializer):
     class Meta:
         model = PurchaseOrderLine
         fields = '__all__'
-        read_only_fields = ['quantity_received']
+        read_only_fields = ['quantity_received', 'po']
+
+
+class POLineWriteSerializer(serializers.ModelSerializer):
+    """Used for creating/updating PO lines - po field is set by the parent."""
+    class Meta:
+        model = PurchaseOrderLine
+        fields = ['item', 'quantity_ordered', 'unit_price']
 
 
 class POReceiptLineSerializer(serializers.ModelSerializer):
@@ -60,7 +67,7 @@ class PurchaseOrderSerializer(serializers.ModelSerializer):
 
 
 class PurchaseOrderWriteSerializer(serializers.ModelSerializer):
-    lines = POLineSerializer(many=True)
+    lines = POLineWriteSerializer(many=True)
 
     class Meta:
         model = PurchaseOrder

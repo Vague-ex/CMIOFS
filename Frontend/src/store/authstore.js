@@ -9,7 +9,7 @@ function decodeToken(accessToken) {
 }
 
 function getInitialUser() {
-    const token = localStorage.getItem('access_token')
+    const token = localStorage.getItem('access_token') || localStorage.getItem('access')
     if (!token) return null
     const payload = decodeToken(token)
     const role = payload?.role || payload?.user_role || ''
@@ -18,11 +18,13 @@ function getInitialUser() {
 
 export const useAuthStore = create((set) => ({
     user: getInitialUser(),
-    isAuthenticated: !!localStorage.getItem('access_token'),
+    isAuthenticated: !!(localStorage.getItem('access_token') || localStorage.getItem('access')),
 
     login: (user, accessToken, refreshToken) => {
         localStorage.setItem('access_token', accessToken)
         localStorage.setItem('refresh_token', refreshToken)
+        localStorage.setItem('access', accessToken)
+        localStorage.setItem('refresh', refreshToken)
 
         // Decode role from JWT payload
         const payload = decodeToken(accessToken)

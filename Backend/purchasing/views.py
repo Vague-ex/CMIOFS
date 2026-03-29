@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction
+from django.core.mail import send_mail
 from django_filters.rest_framework import DjangoFilterBackend
 from accounts.permissions import IsAdminOrManager
 from inventory.models import InventoryTransaction
@@ -36,7 +37,43 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Only draft POs can be submitted.'}, status=400)
         po.status = PurchaseOrder.Status.SUBMITTED
         po.save()
-        return Response(PurchaseOrderSerializer(po).data)
+
+        email_result = {'sent': False, 'message': ''}
+        supplier_email = (po.supplier.email or '').strip()
+        if supplier_email:
+            try:
+                lines = po.lines.select_related('item').all()
+                line_rows = [
+                    f"- {ln.item.name}: qty {ln.quantity_ordered} @ {ln.unit_price}"
+                    for ln in lines
+                ]
+                note_line = f"\nNotes: {po.notes}" if po.notes else ''
+                message = (
+                    f"Dear {po.supplier.contact_name or po.supplier.name},\n\n"
+                    f"A new purchase order has been submitted.\n\n"
+                    f"PO Number: {po.po_number}\n"
+                    f"Supplier: {po.supplier.name}\n"
+                    f"Status: {po.status}\n\n"
+                    f"Items:\n" + "\n".join(line_rows) +
+                    f"\n\nPlease confirm receipt of this order."
+                    f"{note_line}\n"
+                )
+                send_mail(
+                    subject=f"Purchase Order {po.po_number}",
+                    message=message,
+                    from_email=None,
+                    recipient_list=[supplier_email],
+                    fail_silently=False,
+                )
+                email_result = {'sent': True, 'message': f'PO email sent to {supplier_email}.'}
+            except Exception as ex:
+                email_result = {'sent': False, 'message': f'PO submitted but email failed: {str(ex)}'}
+        else:
+            email_result = {'sent': False, 'message': 'PO submitted but supplier has no email address.'}
+
+        data = PurchaseOrderSerializer(po).data
+        data['email_notification'] = email_result
+        return Response(data)
 
     @action(detail=True, methods=['post'], url_path='supplier-accept')
     def supplier_accept(self, request, pk=None):

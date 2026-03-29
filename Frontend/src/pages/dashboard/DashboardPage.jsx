@@ -29,10 +29,6 @@ export default function DashboardPage() {
             icon: Package,
             bgColor: 'bg-blue-100',
             iconColor: 'text-blue-500',
-            changes: [
-                { text: '+3 added this week', color: 'text-green-600' },
-                { text: '-2 deactivated this week', color: 'text-red-600' }
-            ]
         },
         {
             label: 'Open Purchase Orders',
@@ -40,9 +36,6 @@ export default function DashboardPage() {
             icon: ShoppingCart,
             bgColor: 'bg-cyan-100',
             iconColor: 'text-cyan-500',
-            changes: [
-                { text: '+2 today', color: 'text-green-600' }
-            ]
         },
         {
             label: 'Low-Stock Items',
@@ -50,9 +43,6 @@ export default function DashboardPage() {
             icon: AlertTriangle,
             bgColor: 'bg-orange-100',
             iconColor: 'text-orange-500',
-            changes: [
-                { text: '+1 today', color: 'text-red-600' }
-            ]
         },
         {
             label: 'Out of Stock',
@@ -60,9 +50,6 @@ export default function DashboardPage() {
             icon: Truck,
             bgColor: 'bg-green-100',
             iconColor: 'text-green-500',
-            changes: [
-                { text: '0 today', color: 'text-gray-500' }
-            ]
         },
     ]
 
@@ -78,13 +65,6 @@ export default function DashboardPage() {
                             <div className="flex items-start justify-between mb-4">
                                 <div className={`${stat.bgColor} rounded-lg p-3`}>
                                     <Icon className={`${stat.iconColor} w-6 h-6`} />
-                                </div>
-                                <div className="text-right">
-                                    {stat.changes.map((change, idx) => (
-                                        <div key={idx} className={`text-xs font-semibold ${change.color}`}>
-                                            {change.text}
-                                        </div>
-                                    ))}
                                 </div>
                             </div>
                             <p className="text-3xl font-bold text-[#1F3864] mb-1">{stat.value}</p>

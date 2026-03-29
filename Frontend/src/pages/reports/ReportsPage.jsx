@@ -232,10 +232,6 @@ function InventoryTab({ dateFrom, dateTo }) {
             icon: Package,
             bgColor: 'bg-blue-100',
             iconColor: 'text-blue-500',
-            changes: [
-                { text: '+3 added this week', color: 'text-green-600' },
-                { text: '-2 deactivated this week', color: 'text-red-600' }
-            ]
         },
         {
             label: 'Total Stock Value',
@@ -243,9 +239,6 @@ function InventoryTab({ dateFrom, dateTo }) {
             icon: DollarSign,
             bgColor: 'bg-green-100',
             iconColor: 'text-green-500',
-            changes: [
-                { text: 'Current value', color: 'text-green-600' }
-            ]
         },
         {
             label: 'Low-Stock Items',
@@ -253,9 +246,6 @@ function InventoryTab({ dateFrom, dateTo }) {
             icon: AlertTriangle,
             bgColor: 'bg-orange-100',
             iconColor: 'text-orange-500',
-            changes: [
-                { text: '+1 today', color: 'text-red-600' }
-            ]
         },
         {
             label: 'Out of Stock',
@@ -263,9 +253,6 @@ function InventoryTab({ dateFrom, dateTo }) {
             icon: Truck,
             bgColor: 'bg-red-100',
             iconColor: 'text-red-500',
-            changes: [
-                { text: '0 today', color: 'text-gray-500' }
-            ]
         },
     ]
 
@@ -281,13 +268,6 @@ function InventoryTab({ dateFrom, dateTo }) {
                                 <div className="flex items-start justify-between mb-4">
                                     <div className={`${stat.bgColor} rounded-lg p-3`}>
                                         <Icon className={`${stat.iconColor} w-6 h-6`} />
-                                    </div>
-                                    <div className="text-right">
-                                        {stat.changes.map((change, idx) => (
-                                            <div key={idx} className={`text-xs font-semibold ${change.color}`}>
-                                                {change.text}
-                                            </div>
-                                        ))}
                                     </div>
                                 </div>
                                 <p className="text-3xl font-bold text-[#1F3864] mb-1">{stat.value}</p>
