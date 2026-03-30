@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     getItems, createItem, updateItem, deleteItem,
-    previewSku, getCategories, getUOMs
+    previewSku, getCategories, getUOMs, stockInItem
 } from '../../api/inventory'
 import { toast } from 'sonner'
-import { Pencil, Trash2, X, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Pencil, Trash2, X, RefreshCw, ChevronDown, ChevronUp, PackagePlus } from 'lucide-react'
 
 const EMPTY_FORM = {
     name: '', sku: '', description: '',
@@ -44,6 +44,139 @@ function SectionToggle({ label, open, onToggle }) {
         </button>
     )
 }
+
+// ── Stock-In Modal ─────────────────────────────────────────────────────────────
+
+const TRANSACTION_REASONS = [
+    { value: 'INITIAL_STOCK', label: 'Initial Stock (first-time setup)' },
+    { value: 'MANUAL_IN', label: 'Manual Stock In' },
+    { value: 'RETURN', label: 'Return to Stock' },
+    { value: 'ADJUSTMENT', label: 'Stock Adjustment' },
+]
+
+function StockInModal({ item, onClose, onSuccess }) {
+    const [quantity, setQuantity] = useState('')
+    const [reason, setReason] = useState('INITIAL_STOCK')
+    const [note, setNote] = useState('')
+    const [saving, setSaving] = useState(false)
+    const [error, setError] = useState('')
+
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+        const qty = parseFloat(quantity)
+        if (!qty || qty <= 0) {
+            setError('Quantity must be a positive number.')
+            return
+        }
+        setSaving(true)
+        setError('')
+        try {
+            const res = await stockInItem(item.id, { quantity: qty, reason, note })
+            onSuccess(res.data)
+        } catch (err) {
+            setError(
+                err?.response?.data?.error ||
+                err?.response?.data?.detail ||
+                'Failed to add stock.'
+            )
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <div className="flex items-center justify-between px-6 py-4 border-b">
+                    <div className="flex items-center gap-2">
+                        <PackagePlus size={18} className="text-[#2E75B6]" />
+                        <div>
+                            <h3 className="text-base font-semibold text-[#1F3864]">Add Stock</h3>
+                            <p className="text-xs text-gray-500 mt-0.5">{item.name} — current: {Number(item.current_quantity).toFixed(2)} {item.uom_abbreviation || ''}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                    <div>
+                        <label className={labelCls}>Quantity to Add *</label>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min="0.0001"
+                                step="any"
+                                className={inputCls}
+                                value={quantity}
+                                onChange={e => setQuantity(e.target.value)}
+                                placeholder="e.g. 100"
+                                required
+                                autoFocus
+                            />
+                            {item.uom_abbreviation && (
+                                <span className="text-sm text-gray-500 font-mono shrink-0 bg-gray-100 px-3 py-2 rounded-md border border-gray-300">
+                                    {item.uom_abbreviation}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className={labelCls}>Reason *</label>
+                        <select
+                            className={inputCls}
+                            value={reason}
+                            onChange={e => setReason(e.target.value)}
+                        >
+                            {TRANSACTION_REASONS.map(r => (
+                                <option key={r.value} value={r.value}>{r.label}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className={labelCls}>Note (optional)</label>
+                        <textarea
+                            className={inputCls}
+                            rows={2}
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                            placeholder="Reference number, batch info, remarks..."
+                        />
+                    </div>
+
+                    {error && (
+                        <p className="text-sm text-red-700 bg-red-50 rounded-md px-3 py-2 border border-red-200">
+                            {error}
+                        </p>
+                    )}
+
+                    <div className="flex gap-2 justify-end border-t pt-4">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="px-4 py-2 text-sm bg-[#2E75B6] text-white rounded-md hover:bg-[#1F3864] disabled:opacity-50 flex items-center gap-2"
+                        >
+                            <PackagePlus size={14} />
+                            {saving ? 'Adding...' : 'Add Stock'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    )
+}
+
+// ── Item Form ──────────────────────────────────────────────────────────────────
 
 function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uoms }) {
     const [form, setForm] = useState(initial)
@@ -84,7 +217,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
 
     const handleSubmit = (e) => {
         e.preventDefault()
-        // Strip empty spec fields so we don't save blank objects
         const spec = form.material_spec_data
         const hasSpec = Object.values(spec).some(v => v !== '' && v !== null && v !== undefined)
         onSubmit({
@@ -106,8 +238,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
             </div>
 
             <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
-
-                {/* ── Core fields ── */}
                 <Field label="Name *">
                     <input className={inputCls} value={form.name}
                         onChange={e => set('name', e.target.value)} required />
@@ -170,7 +300,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
                     </Field>
                 </div>
 
-                {/* ── Material Specs toggle ── */}
                 <SectionToggle
                     label="Material Specifications (optional)"
                     open={showSpec}
@@ -179,7 +308,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
 
                 {showSpec && (
                     <>
-                        {/* Classification */}
                         <p className="col-span-2 text-xs font-semibold text-gray-400 uppercase tracking-wide">
                             Classification
                         </p>
@@ -212,7 +340,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
                                 onChange={e => setSpec('certification', e.target.value)} />
                         </Field>
 
-                        {/* Strength */}
                         <p className="col-span-2 text-xs font-semibold text-gray-400 uppercase tracking-wide mt-2">
                             Strength / Mix
                         </p>
@@ -237,7 +364,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
                             </Field>
                         </div>
 
-                        {/* Dimensions */}
                         <p className="col-span-2 text-xs font-semibold text-gray-400 uppercase tracking-wide mt-2">
                             Dimensions
                         </p>
@@ -256,7 +382,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
                             </Field>
                         ))}
 
-                        {/* Appearance */}
                         <p className="col-span-2 text-xs font-semibold text-gray-400 uppercase tracking-wide mt-2">
                             Appearance
                         </p>
@@ -283,7 +408,6 @@ function ItemForm({ initial, onSubmit, onCancel, isPending, mode, categories, uo
                     </>
                 )}
 
-                {/* Actions */}
                 <div className="col-span-2 flex gap-2 justify-end pt-2 border-t">
                     <button type="button" onClick={onCancel}
                         className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">
@@ -323,7 +447,6 @@ function DeleteDialog({ item, onConfirm, onCancel, isPending }) {
     )
 }
 
-// Spec summary badge shown in the table row
 function SpecBadge({ spec }) {
     if (!spec) return <span className="text-gray-300 text-xs">—</span>
     const parts = [spec.grade, spec.material_type, spec.standard].filter(Boolean)
@@ -335,11 +458,14 @@ function SpecBadge({ spec }) {
     )
 }
 
+// ── Main Page ──────────────────────────────────────────────────────────────────
+
 export default function ItemsPage() {
     const queryClient = useQueryClient()
     const [mode, setMode] = useState(null)
     const [editingItem, setEditingItem] = useState(null)
     const [deletingItem, setDeletingItem] = useState(null)
+    const [stockInItem_, setStockInItem] = useState(null)
     const [search, setSearch] = useState('')
 
     const { data, isLoading } = useQuery({
@@ -391,6 +517,18 @@ export default function ItemsPage() {
                     onConfirm={() => deleteMutation.mutate(deletingItem.id)}
                     onCancel={() => setDeletingItem(null)}
                     isPending={deleteMutation.isPending} />
+            )}
+
+            {stockInItem_ && (
+                <StockInModal
+                    item={stockInItem_}
+                    onClose={() => setStockInItem(null)}
+                    onSuccess={(updatedItem) => {
+                        invalidate()
+                        setStockInItem(null)
+                        toast.success(`Stock added. New quantity: ${Number(updatedItem.current_quantity).toFixed(2)} ${updatedItem.uom_abbreviation || ''}`)
+                    }}
+                />
             )}
 
             <div className="flex items-center justify-between mb-6">
@@ -465,7 +603,9 @@ export default function ItemsPage() {
                                         <td className="px-4 py-3 text-gray-500">
                                             {item.uom_abbreviation || '—'}
                                         </td>
-                                        <td className="px-4 py-3">{Number(item.current_quantity).toFixed(2)}</td>
+                                        <td className="px-4 py-3 font-medium">
+                                            {Number(item.current_quantity).toFixed(2)}
+                                        </td>
                                         <td className="px-4 py-3">{item.reorder_point}</td>
                                         <td className="px-4 py-3">₱{Number(item.standard_cost).toFixed(2)}</td>
                                         <td className="px-4 py-3">
@@ -479,6 +619,13 @@ export default function ItemsPage() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
+                                                <button
+                                                    onClick={() => setStockInItem(item)}
+                                                    className="text-green-600 hover:text-green-800"
+                                                    title="Add Stock"
+                                                >
+                                                    <PackagePlus size={14} />
+                                                </button>
                                                 <button onClick={() => openEdit(item)}
                                                     className="text-[#2E75B6] hover:text-[#1F3864]" title="Edit">
                                                     <Pencil size={14} />

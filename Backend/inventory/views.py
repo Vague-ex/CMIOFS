@@ -1,3 +1,4 @@
+from decimal import Decimal, InvalidOperation
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -50,12 +51,27 @@ class ItemViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='stock-in')
     def stock_in(self, request, pk=None):
         item = self.get_object()
-        quantity   = request.data.get('quantity')
-        reason     = request.data.get('reason', 'MANUAL_IN')
-        note       = request.data.get('note', '')
-        project_id = request.data.get('project_id')
+        raw_quantity = request.data.get('quantity')
+        reason       = request.data.get('reason', 'MANUAL_IN')
+        note         = request.data.get('note', '')
+        project_id   = request.data.get('project_id')
 
-        if not quantity or float(quantity) <= 0:
+        valid_reasons = ['MANUAL_IN', 'INITIAL_STOCK', 'ADJUSTMENT', 'RETURN']
+        if reason not in valid_reasons:
+            return Response(
+                {'error': f'Invalid reason. Choose from: {valid_reasons}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            quantity = Decimal(str(raw_quantity))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response(
+                {'error': 'Quantity must be a valid number.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if quantity <= Decimal('0'):
             return Response(
                 {'error': 'Quantity must be a positive number.'},
                 status=status.HTTP_400_BAD_REQUEST
@@ -77,17 +93,13 @@ class ItemViewSet(viewsets.ModelViewSet):
                 performed_by=request.user,
                 reason_note=note,
             )
-            item.current_quantity += float(quantity)
+            item.current_quantity = item.current_quantity + quantity
             item.save()
 
         return Response(ItemSerializer(item).data)
 
     @action(detail=True, methods=['get'], url_path='convert')
     def convert(self, request, pk=None):
-        """
-        Convert item quantity to another UOM.
-        ?quantity=100&to_uom_id=3
-        """
         item     = self.get_object()
         qty      = float(request.query_params.get('quantity', 0))
         to_uom_id = request.query_params.get('to_uom_id')
@@ -130,7 +142,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all().order_by('-created')
     serializer_class = ProjectSerializer
     filter_backends  = [filters.SearchFilter, DjangoFilterBackend]
-    search_fields    = ['name', 'project_code', 'client']
+    search_fields    = ['name', 'project_code', 'client_name']
     filterset_fields = ['status']
 
 
@@ -143,16 +155,15 @@ class ProjectMaterialViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='deliver')
     def deliver(self, request, pk=None):
-        """
-        Record a partial or full delivery of this project material.
-        Deducts from item stock and updates delivered_quantity.
-        """
         pm       = self.get_object()
-        quantity = float(request.data.get('quantity', 0))
+        try:
+            quantity = Decimal(str(request.data.get('quantity', 0)))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({'error': 'Quantity must be a valid number.'}, status=400)
 
-        if quantity <= 0:
+        if quantity <= Decimal('0'):
             return Response({'error': 'Quantity must be positive.'}, status=400)
-        if quantity > float(pm.remaining_quantity):
+        if quantity > pm.remaining_quantity:
             return Response(
                 {'error': f'Cannot deliver more than remaining quantity ({pm.remaining_quantity}).'},
                 status=400
@@ -167,10 +178,10 @@ class ProjectMaterialViewSet(viewsets.ModelViewSet):
                 performed_by=request.user,
                 reason_note=f'Issued to project {pm.project.project_code}',
             )
-            pm.item.current_quantity -= quantity
+            pm.item.current_quantity = pm.item.current_quantity - quantity
             pm.item.save()
 
-            pm.delivered_quantity += quantity
+            pm.delivered_quantity = pm.delivered_quantity + quantity
             if pm.delivered_quantity >= pm.allocated_quantity:
                 pm.status = ProjectMaterial.Status.DELIVERED
             else:
