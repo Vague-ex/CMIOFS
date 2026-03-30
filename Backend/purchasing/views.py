@@ -1,8 +1,10 @@
 from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from django.db import transaction
 from django.core.mail import send_mail
+from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from accounts.permissions import IsAdminOrManager
 from inventory.models import InventoryTransaction
@@ -43,26 +45,69 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         if supplier_email:
             try:
                 lines = po.lines.select_related('item').all()
-                line_rows = [
-                    f"- {ln.item.name}: qty {ln.quantity_ordered} @ {ln.unit_price}"
+                
+                # Generate HTML table rows
+                table_rows = ''.join([
+                    f"<tr>"
+                    f"<td style='padding: 12px; border-bottom: 1px solid #eee;'>{ln.item.name}</td>"
+                    f"<td style='padding: 12px; border-bottom: 1px solid #eee; text-align: center;'>{ln.quantity_ordered}</td>"
+                    f"<td style='padding: 12px; border-bottom: 1px solid #eee;'>{ln.item.uom.abbreviation if ln.item.uom else 'Unit'}</td>"
+                    f"</tr>"
                     for ln in lines
-                ]
-                note_line = f"\nNotes: {po.notes}" if po.notes else ''
-                message = (
-                    f"Dear {po.supplier.contact_name or po.supplier.name},\n\n"
-                    f"A new purchase order has been submitted.\n\n"
-                    f"PO Number: {po.po_number}\n"
-                    f"Supplier: {po.supplier.name}\n"
-                    f"Status: {po.status}\n\n"
-                    f"Items:\n" + "\n".join(line_rows) +
-                    f"\n\nPlease confirm receipt of this order."
-                    f"{note_line}\n"
-                )
+                ])
+                
+                # Build HTML email
+                html_message = f"""
+                    <html>
+                    <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333;'>
+                        <div style='max-width: 600px; margin: 0 auto; background-color: #f9f9f9; padding: 20px; border-radius: 8px;'>
+                            <p style='font-size: 16px;'>Dear {po.supplier.contact_name or po.supplier.name},</p>
+                            
+                            <p style='font-size: 14px; margin: 20px 0;'>
+                                We have sent a Purchase Order.
+                            </p>
+                            
+                            <p style='font-size: 14px; font-weight: bold; margin: 20px 0;'>
+                                Please click the button below to confirm you have received this order and are delivering it:
+                            </p>
+                            
+                            <div style='text-align: center; margin: 30px 0;'>
+                                <a href='{settings.FRONTEND_BASE_URL}/po/{po.id}/confirm' 
+                                   style='background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;'>
+                                    Confirm Order & Delivery
+                                </a>
+                            </div>
+                            
+                            <h3 style='font-size: 16px; margin-top: 30px; margin-bottom: 15px;'>Items Ordered:</h3>
+                            
+                            <table style='width: 100%; border-collapse: collapse; background-color: white;'>
+                                <thead>
+                                    <tr style='background-color: #f0f0f0;'>
+                                        <th style='padding: 12px; text-align: left; border-bottom: 2px solid #ddd;'>Item</th>
+                                        <th style='padding: 12px; text-align: center; border-bottom: 2px solid #ddd;'>Qty</th>
+                                        <th style='padding: 12px; text-align: left; border-bottom: 2px solid #ddd;'>Unit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {table_rows}
+                                </tbody>
+                            </table>
+                            
+                            <p style='font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;'>
+                                <strong>PO Number:</strong> {po.po_number}<br>
+                                <strong>Supplier:</strong> {po.supplier.name}
+                            </p>
+                        </div>
+                    </body>
+                    </html>
+                """
+                
                 send_mail(
-                    subject=f"Purchase Order {po.po_number}",
-                    message=message,
+                    subject=f"Purchase Order Update: {po.po_number}",
+                    message=f"Dear {po.supplier.contact_name or po.supplier.name},\n\nWe have sent/updated a Purchase Order (Status: {po.status}).\n\nPlease confirm receipt of this order.\n\nPO Number: {po.po_number}",
                     from_email=None,
                     recipient_list=[supplier_email],
+                    html_message=html_message,
                     fail_silently=False,
                 )
                 email_result = {'sent': True, 'message': f'PO email sent to {supplier_email}.'}
@@ -75,7 +120,33 @@ class PurchaseOrderViewSet(viewsets.ModelViewSet):
         data['email_notification'] = email_result
         return Response(data)
 
-    @action(detail=True, methods=['post'], url_path='supplier-accept')
+    @action(detail=True, methods=['post'], url_path='accept')
+    def accept(self, request, pk=None):
+        """Manager accepts the PO (moves from SUBMITTED to ACCEPTED)."""
+        po = self.get_object()
+        if po.status != PurchaseOrder.Status.SUBMITTED:
+            return Response({'error': 'PO must be submitted before accepting.'}, status=400)
+        po.status = PurchaseOrder.Status.ACCEPTED
+        po.save()
+        return Response(PurchaseOrderSerializer(po).data)
+
+    @action(detail=True, methods=['get', 'post'], url_path='confirm', permission_classes=[AllowAny])
+    def confirm(self, request, pk=None):
+        """
+        Public endpoint: supplier confirms receipt via email link or button.
+        No authentication required for this endpoint.
+        """
+        from django.utils import timezone
+        po = self.get_object()
+        if po.status in [PurchaseOrder.Status.CANCELLED, PurchaseOrder.Status.REJECTED]:
+            return Response({'error': 'This PO is cancelled or rejected.'}, status=400)
+        po.supplier_confirmed_at = timezone.now()
+        po.save()
+        return Response({
+            'success': True,
+            'message': f'Thank you! We have recorded that you received PO {po.po_number}.',
+            'po_number': po.po_number,
+        })
     def supplier_accept(self, request, pk=None):
         """Mark as accepted by supplier (admin/manager records this manually)."""
         po = self.get_object()

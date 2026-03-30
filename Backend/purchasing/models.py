@@ -27,6 +27,7 @@ class PurchaseOrder(TimeStampedModel):
         related_name='created_pos'
     )
     supplier_response_note = models.TextField(blank=True)
+    supplier_confirmed_at = models.DateTimeField(null=True, blank=True, help_text='When supplier confirmed receipt via email link')
 
     def save(self, *args, **kwargs):
         if not self.po_number:

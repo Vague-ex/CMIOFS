@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
     getPurchaseOrders, createPurchaseOrder,
-    submitPO, supplierAcceptPO, supplierRejectPO,
+    submitPO, acceptPO, supplierAcceptPO, supplierRejectPO,
     receivePO, cancelPO,
 } from '../../api/purchasing'
 import { getSuppliers, createSupplierRequest } from '../../api/suppliers'
@@ -662,6 +662,7 @@ function PODetailDrawer({ po, onClose, onAction }) {
     if (!po) return null
 
     const canSubmit = po.status === 'DRAFT'
+    const canAccept = po.status === 'SUBMITTED'
     const canRespond = po.status === 'SUBMITTED'
     const canReceive = po.status === 'ACCEPTED' || po.status === 'PARTIALLY'
     const canCancel = !['RECEIVED', 'CANCELLED'].includes(po.status)
@@ -694,10 +695,18 @@ function PODetailDrawer({ po, onClose, onAction }) {
                             Submit to Supplier
                         </button>
                     )}
+                    {canAccept && (
+                        <button
+                            onClick={() => onAction('accept', po)}
+                            className="px-3 py-1.5 text-xs bg-green-600 text-white rounded-md hover:bg-green-700"
+                        >
+                            Accept Order
+                        </button>
+                    )}
                     {canRespond && (
                         <button
                             onClick={() => onAction('respond', po)}
-                            className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-md hover:bg-emerald-700"
+                            className="px-3 py-1.5 text-xs border border-blue-300 text-blue-600 rounded-md hover:bg-blue-50"
                         >
                             Record Response
                         </button>
@@ -871,6 +880,16 @@ export default function PurchaseOrdersPage() {
         onError: () => toast.error('Failed to submit.'),
     })
 
+    const acceptMut = useMutation({
+        mutationFn: id => acceptPO(id),
+        onSuccess: res => {
+            invalidate()
+            setDrawerPO(res.data)
+            toast.success('PO accepted. Ready to receive.')
+        },
+        onError: () => toast.error('Failed to accept.'),
+    })
+
     const cancelMut = useMutation({
         mutationFn: id => cancelPO(id),
         onSuccess: res => {
@@ -883,6 +902,7 @@ export default function PurchaseOrdersPage() {
 
     const handleAction = (action, po) => {
         if (action === 'submit') { submitMut.mutate(po.id) }
+        if (action === 'accept') { acceptMut.mutate(po.id) }
         if (action === 'cancel') { cancelMut.mutate(po.id) }
         if (action === 'respond') { setSelectedPO(po); setModal('respond') }
         if (action === 'receive') { setSelectedPO(po); setModal('receive') }
